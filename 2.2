@@ -1,0 +1,98 @@
+import socket
+import threading
+import random
+
+HOST = '192.168.31.197'
+PORT = 5556
+N = 64
+
+def handle_client(client_socket, address):
+    print(f"Підключено клієнта: {address}")
+    balance = N
+    guessed_number = random.randint(1, N)
+    client_socket.sendall(f"Start. Balance={balance}\n".encode())
+    print(f"Загадане число для клієнта {address}: {guessed_number}")
+
+    try:
+        while True:
+            data = client_socket.recv(1024).decode().strip()
+            if not data:
+                break
+            print(f"Від клієнта {address}: {data}")
+
+            if data.upper() == "END":
+                client_socket.sendall(f"Loosed. I guessed {guessed_number}\n".encode())
+                break
+
+            try:
+                a, b = map(int, data.split())
+                if not (1 <= a <= b <= N):
+                    raise ValueError
+            except ValueError:
+                client_socket.sendall("Try again. Введіть два числа a b (1 ≤ a ≤ b ≤ 64).\n".encode())
+                continue
+
+            if a == b == guessed_number:
+                client_socket.sendall(f"Win! Prize={balance}\n".encode())
+                break
+
+            if a <= guessed_number <= b:
+                balance -= (b - a + 1)
+                if balance <= 0:
+                    client_socket.sendall(f"Loosed. I guessed {guessed_number}\n".encode())
+                    break
+                client_socket.sendall(f"In range. Balance={balance}\n".encode())
+            else:
+                balance -= (b - a + 1)
+                if balance <= 0:
+                    client_socket.sendall(f"Loosed. I guessed {guessed_number}\n".encode())
+                    break
+                client_socket.sendall(f"Out of range. Balance={balance}\n".encode())
+    except Exception as e:
+        print(f"Помилка у клієнта {address}: {e}")
+    finally:
+        print(f"Network Error {address}")
+        client_socket.close()
+
+def start_server():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind((HOST, PORT))
+    server.listen(5)
+    print(f"Сервер запущено на {HOST}:{PORT}")
+
+    while True:
+        client_socket, address = server.accept()
+        client_thread = threading.Thread(target=handle_client, args=(client_socket, address))
+        client_thread.start()
+
+def start_client():
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((HOST, PORT))
+
+    try:
+        while True:
+            response = client.recv(1024).decode().strip()
+            print(response)
+
+            if response.startswith("Win") or response.startswith("Loosed"):
+                break
+
+            message = input("Введіть діапазон (a b) або END: ").strip()
+            client.sendall(message.encode())
+
+            if message.upper() == "END":
+                break
+    except Exception as e:
+        print(f"Помилка: {e}")
+    finally:
+        client.close()
+
+if __name__ == "__main__":
+    mode = input("Виберіть режим (server/client): ").strip().lower()
+    if mode == "server":
+        start_server()
+    elif mode == "client":
+        start_client()
+    else:
+        print("Невірний режим.")
