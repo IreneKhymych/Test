@@ -1,0 +1,29 @@
+import socket
+
+HOST = '192.168.31.197'  # Вкажіть IP сервера
+PORT = 5556
+
+def start_client():
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((HOST, PORT))
+
+    try:
+        while True:
+            response = client.recv(1024).decode().strip()
+            print(response)
+
+            if response.startswith("Win") or response.startswith("Loosed"):
+                break
+
+            message = input("Введіть діапазон [a b] або END: ").strip()
+            client.sendall(message.encode())
+
+            if message.upper() == "END":
+                break
+    except Exception as e:
+        print(f"Помилка: {e}")
+    finally:
+        client.close()
+
+if __name__ == "__main__":
+    start_client()
